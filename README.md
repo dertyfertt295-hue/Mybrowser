@@ -1,19 +1,18 @@
-# Mapbox Navigator
+# MapLibre Navigator
 
-Крепкая стартовая основа кастомного навигатора на официальных библиотеках Mapbox.
+Крепкая стартовая основа кастомного навигатора на открытом стекe: **MapLibre GL JS** для карты, **OpenFreeMap** для стилей/тайлов и **GraphHopper Directions API** для поиска адресов и маршрутов.
 
 ## Возможности
 
-- интерактивная карта Mapbox GL JS;
-- определение местоположения пользователя через Geolocation API и Mapbox Geolocate Control;
-- поиск адресов и мест через Mapbox Geocoder;
-- построение маршрутов через Mapbox Directions;
-- базовая панель навигации с дистанцией, временем и первыми инструкциями маршрута;
+- интерактивная карта MapLibre GL JS;
+- бесплатный публичный стиль OpenFreeMap `liberty` без отдельного token;
+- определение местоположения пользователя через Geolocation API и MapLibre Geolocate Control;
+- поиск адресов и мест через GraphHopper Geocoding API;
+- построение автомобильного маршрута через GraphHopper Routing API;
+- отображение линии маршрута, маркеров старта/финиша, дистанции, времени и первых инструкций;
 - спокойный минималистичный визуальный фундамент без неонового перегруза.
 
 ## Запуск локально без деплоя
-
-Проект можно полностью проверить на своём компьютере: Netlify или другой хостинг для этого не нужен.
 
 ### 1. Установите зависимости
 
@@ -27,15 +26,15 @@ npm install
 cp .env.example .env.local
 ```
 
-### 3. Добавьте Mapbox token
+### 3. Добавьте GraphHopper API key
 
-Откройте `.env.local` и замените значение на свой публичный Mapbox access token:
+Откройте `.env.local` и замените значение на свой GraphHopper API key:
 
 ```bash
-VITE_MAPBOX_ACCESS_TOKEN=your_mapbox_access_token_here
+VITE_GRAPHHOPPER_API_KEY=your_graphhopper_api_key_here
 ```
 
-Token можно взять в Mapbox Dashboard. Для локального теста достаточно обычного public token.
+OpenFreeMap для отображения карты отдельный token не требует. GraphHopper key нужен для поиска адресов и построения маршрутов.
 
 ### 4. Запустите dev-сервер
 
@@ -49,78 +48,45 @@ npm run dev
 http://localhost:5173/
 ```
 
-Откройте этот адрес в браузере. Если тестируете на другом устройстве в той же Wi-Fi сети, используйте Network URL, который Vite тоже выводит в терминале.
-
 ## Что проверить вручную
 
-1. Карта загружается без ошибок и отображает базовый стиль Mapbox.
+1. Карта загружается на стиле OpenFreeMap.
 2. Браузер запрашивает разрешение на геолокацию.
 3. После разрешения геолокации карта центрируется ближе к текущей позиции.
 4. Кнопка «Моё местоположение» возвращает карту к текущей позиции.
-5. Поиск адресов/мест работает через верхнее поле Mapbox Geocoder.
-6. Маршрут строится через Mapbox Directions после выбора точки отправления и назначения.
-7. В панели навигации появляются дистанция, примерное время и первые шаги маршрута.
+5. В поле «Куда» можно ввести адрес и построить маршрут.
+6. Можно кликнуть по карте, чтобы выбрать точку назначения.
+7. После построения маршрута появляются линия маршрута, дистанция, примерное время и первые шаги.
 
-## Важные заметки для локального теста
+## Важные заметки
 
 - Геолокация в браузере работает только в secure context. `localhost` считается безопасным, поэтому локально всё должно работать без HTTPS.
-- Если тестируете с телефона через локальный IP компьютера, браузер может заблокировать геолокацию без HTTPS. В таком случае проще сначала проверить на компьютере через `http://localhost:5173/`.
-- Если карта не загрузилась, первым делом проверьте `.env.local`, корректность `VITE_MAPBOX_ACCESS_TOKEN` и перезапустите `npm run dev`.
-- Если Mapbox показывает ошибки авторизации, проверьте настройки token в Mapbox Dashboard: он должен иметь доступ к styles, geocoding и directions.
+- Если тестируете с телефона через локальный IP компьютера, браузер может заблокировать геолокацию без HTTPS.
+- Если маршруты не строятся, проверьте `.env.local`, корректность `VITE_GRAPHHOPPER_API_KEY` и перезапустите `npm run dev`.
+- В Netlify после изменения env-переменной нужно сделать новый deploy.
 
-## Проверки перед будущим деплоем
+## Проверки перед деплоем
 
 ```bash
 npm run lint
 npm run build
 ```
 
-## Быстрый preview без сборки
-
-Если нужно быстро показать основу навигатора по временному туннелю, можно поднять standalone preview из папки `preview`. Он использует официальные CDN-версии Mapbox GL JS, Mapbox Geocoder и Mapbox Directions, поэтому не требует `npm install`/Vite-сборки.
-
-```bash
-python3 -m http.server 8000 --directory preview
-```
-
-После этого preview доступен локально на:
-
-```text
-http://localhost:8000/
-```
-
-На странице нужно вставить public Mapbox token. Он сохранится только в `localStorage` текущего браузера.
-
 ## Деплой на Netlify
 
-Самый простой вариант — подключить GitHub/GitLab/Bitbucket репозиторий к Netlify. Netlify сам установит зависимости, соберёт Vite-приложение и опубликует папку `dist`.
+Проект уже содержит `netlify.toml`, поэтому Netlify должен автоматически использовать:
 
-### 1. Залейте проект в Git-репозиторий
+- **Build command:** `npm run build`
+- **Publish directory:** `dist`
 
-Если репозиторий ещё не создан, создайте его на GitHub и отправьте туда текущий проект:
-
-```bash
-git remote add origin https://github.com/YOUR_USERNAME/YOUR_REPOSITORY.git
-git push -u origin main
-```
-
-Если remote уже есть, достаточно:
-
-```bash
-git push
-```
-
-### 2. Создайте сайт в Netlify
+### 1. Подключите репозиторий
 
 1. Откройте [Netlify](https://app.netlify.com/).
 2. Нажмите **Add new site** → **Import an existing project**.
-3. Выберите Git-провайдера, где лежит проект.
+3. Выберите GitHub/GitLab/Bitbucket.
 4. Выберите репозиторий с этим приложением.
-5. Netlify прочитает `netlify.toml`, поэтому настройки сборки должны подтянуться автоматически:
-   - **Build command:** `npm run build`
-   - **Publish directory:** `dist`
 
-### 3. Добавьте Mapbox token в Environment Variables
+### 2. Добавьте GraphHopper key
 
 В Netlify откройте:
 
@@ -131,46 +97,40 @@ Site configuration → Environment variables
 Добавьте переменную:
 
 ```text
-VITE_MAPBOX_ACCESS_TOKEN=ваш_public_mapbox_token
+VITE_GRAPHHOPPER_API_KEY=ваш_graphhopper_api_key
 ```
 
 Важно: для Vite переменная должна начинаться именно с `VITE_`, иначе она не попадёт в браузерную сборку.
 
-### 4. Запустите деплой
-
-После добавления переменной нажмите:
+### 3. Запустите деплой
 
 ```text
 Deploys → Trigger deploy → Deploy site
 ```
 
-Когда сборка закончится, Netlify даст временный домен вида:
+Netlify выдаст временный домен вида:
 
 ```text
 https://your-site-name.netlify.app
 ```
 
-Его можно сразу открыть и проверить карту, поиск, геолокацию и маршруты.
+## Где взять GraphHopper API key
 
-### 5. Если карта не открылась на Netlify
+1. Откройте [GraphHopper](https://www.graphhopper.com/).
+2. Зарегистрируйтесь или войдите в аккаунт.
+3. Откройте dashboard/developer-раздел и создайте API key.
+4. Вставьте ключ в `.env.local` локально или в Environment Variables на Netlify как `VITE_GRAPHHOPPER_API_KEY`.
 
-Проверьте по порядку:
+## Быстрый preview без сборки
 
-1. В Netlify добавлена переменная `VITE_MAPBOX_ACCESS_TOKEN`.
-2. После добавления переменной был сделан новый deploy.
-3. В Mapbox Dashboard token активен и имеет доступ к styles, geocoding и directions.
-4. В Netlify в логах сборки нет ошибок `npm run build`.
-5. Сайт открыт по `https://...netlify.app`, потому что геолокация в браузере требует HTTPS. Netlify выдаёт HTTPS автоматически.
-
-## Альтернативный ручной деплой на Netlify без Git
-
-Можно собрать проект локально и загрузить папку `dist` вручную:
+Standalone preview лежит в папке `preview` и использует CDN-версию MapLibre + OpenFreeMap. Для маршрутов введите GraphHopper API key на странице.
 
 ```bash
-npm install
-npm run build
+python3 -m http.server 8000 --directory preview
 ```
 
-После этого в Netlify откройте **Add new site** → **Deploy manually** и перетащите папку `dist` в окно браузера.
+После этого preview доступен локально на:
 
-Минус ручного способа: перед сборкой token должен быть в локальном `.env.local`, а после каждого изменения придётся заново выполнять `npm run build` и загружать новую папку `dist`.
+```text
+http://localhost:8000/
+```
