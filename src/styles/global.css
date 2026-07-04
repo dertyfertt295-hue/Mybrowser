@@ -189,7 +189,10 @@ h2 {
 }
 
 .map-container {
+  position: relative;
   min-height: 100vh;
+  overflow: hidden;
+  background: #dbe7f3;
 }
 
 .maplibregl-ctrl-top-left {

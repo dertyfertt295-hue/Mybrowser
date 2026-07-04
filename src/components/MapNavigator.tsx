@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Feature, LineString } from 'geojson';
-import maplibregl from 'maplibre-gl';
+import maplibregl, { type StyleSpecification } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import {
   DEFAULT_CENTER,
   DEFAULT_ZOOM,
   GRAPHHOPPER_API_BASE_URL,
   GRAPHHOPPER_API_KEY,
+  MAP_STYLE_FALLBACK_NOTICE,
   OPENFREEMAP_STYLE_URL,
   isGraphHopperConfigured,
 } from '../config/navigation';
@@ -42,6 +43,25 @@ interface GraphHopperRouteResponse {
 
 const routeSourceId = 'active-route';
 const routeLayerId = 'active-route-line';
+
+const fallbackRasterStyle: StyleSpecification = {
+  version: 8,
+  sources: {
+    osm: {
+      type: 'raster',
+      tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+      tileSize: 256,
+      attribution: '© OpenStreetMap contributors',
+    },
+  },
+  layers: [
+    {
+      id: 'osm-raster',
+      type: 'raster',
+      source: 'osm',
+    },
+  ],
+};
 
 const buildPlaceLabel = (hit: NonNullable<GraphHopperGeocodingResponse['hits']>[number]) =>
   [hit.name, hit.street, hit.housenumber, hit.city, hit.state, hit.country].filter(Boolean).join(', ');
@@ -127,6 +147,7 @@ export function MapNavigator() {
   const [destination, setDestination] = useState<Coordinates | null>(null);
   const [route, setRoute] = useState<RouteSummary | null>(null);
   const [routeError, setRouteError] = useState<string | null>(null);
+  const [mapError, setMapError] = useState<string | null>(null);
   const [isRouting, setIsRouting] = useState(false);
   const { coordinates, error, isLocating, requestLocation } = useUserLocation();
   const coordinatesRef = useRef<Coordinates | null>(null);
@@ -140,14 +161,33 @@ export function MapNavigator() {
       return;
     }
 
-    const map = new maplibregl.Map({
-      container: mapContainerRef.current,
-      style: OPENFREEMAP_STYLE_URL,
-      center: DEFAULT_CENTER,
-      zoom: DEFAULT_ZOOM,
-      pitchWithRotate: false,
-    });
+    let map: maplibregl.Map;
 
+    try {
+      map = new maplibregl.Map({
+        container: mapContainerRef.current,
+        style: OPENFREEMAP_STYLE_URL,
+        center: DEFAULT_CENTER,
+        zoom: DEFAULT_ZOOM,
+        pitchWithRotate: false,
+      });
+    } catch (error) {
+      setMapError(error instanceof Error ? error.message : 'Не удалось запустить карту в этом браузере.');
+      return;
+    }
+
+    let didFallbackToRaster = false;
+    const handleMapError = (event: { error?: Error }) => {
+      console.error('MapLibre error:', event.error);
+
+      if (!didFallbackToRaster && event.error) {
+        didFallbackToRaster = true;
+        setMapError(MAP_STYLE_FALLBACK_NOTICE);
+        map.setStyle(fallbackRasterStyle);
+      }
+    };
+
+    map.on('error', handleMapError);
     map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'bottom-right');
     map.addControl(new maplibregl.FullscreenControl(), 'bottom-right');
     map.addControl(
@@ -172,6 +212,7 @@ export function MapNavigator() {
     mapRef.current = map;
 
     return () => {
+      map.off('error', handleMapError);
       map.remove();
       mapRef.current = null;
     };
@@ -311,7 +352,7 @@ export function MapNavigator() {
       <NavigationPanel
         route={route}
         locationError={error}
-        routeError={routeError}
+        routeError={routeError || mapError}
         isLocating={isLocating}
         isRouting={isRouting}
         isRoutingConfigured={isGraphHopperConfigured}
