@@ -146,7 +146,6 @@ export function MapNavigator() {
       center: DEFAULT_CENTER,
       zoom: DEFAULT_ZOOM,
       pitchWithRotate: false,
-      attributionControl: true,
     });
 
     map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'bottom-right');
@@ -155,7 +154,6 @@ export function MapNavigator() {
       new maplibregl.GeolocateControl({
         positionOptions: { enableHighAccuracy: true },
         trackUserLocation: true,
-        showUserHeading: true,
       }),
       'bottom-right',
     );
