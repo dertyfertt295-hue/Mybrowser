@@ -86,21 +86,17 @@ npm run build
 3. Выберите GitHub/GitLab/Bitbucket.
 4. Выберите репозиторий с этим приложением.
 
-### 2. Добавьте GraphHopper key
+### 2. GraphHopper key уже добавлен для Netlify
 
-В Netlify откройте:
+Для удобного деплоя без ручной настройки Environment Variables в Netlify ключ уже лежит в `.env.production`:
 
-```text
-Site configuration → Environment variables
-```
-
-Добавьте переменную:
-
-```text
+```bash
 VITE_GRAPHHOPPER_API_KEY=ваш_graphhopper_api_key
 ```
 
-Важно: для Vite переменная должна начинаться именно с `VITE_`, иначе она не попадёт в браузерную сборку.
+Vite автоматически подхватит этот файл во время production-сборки на Netlify. Если позже захотите поменять ключ, замените значение в `.env.production` и запушьте новый коммит.
+
+Важно: такой ключ будет встроен во фронтенд-сборку и будет виден в браузере. Для публичного сайта лучше ограничить ключ в GraphHopper dashboard, если такая настройка доступна на вашем тарифе.
 
 ### 3. Запустите деплой
 
