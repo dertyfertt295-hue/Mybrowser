@@ -10,6 +10,8 @@ import { useUserLocation } from '../hooks/useUserLocation';
 import type { RouteSummary } from '../types/navigation';
 import { NavigationPanel } from './NavigationPanel';
 
+type GeocoderMapboxGl = ConstructorParameters<typeof MapboxGeocoder>[0] extends { mapboxgl?: infer T } ? T : never;
+
 interface DirectionsRouteEvent {
   route: Array<{
     distance: number;
@@ -59,7 +61,7 @@ export function MapNavigator() {
 
     const geocoder = new MapboxGeocoder({
       accessToken: MAPBOX_ACCESS_TOKEN,
-      mapboxgl,
+      mapboxgl: mapboxgl as unknown as GeocoderMapboxGl,
       marker: false,
       placeholder: 'Поиск адреса или места',
       language: 'ru',
