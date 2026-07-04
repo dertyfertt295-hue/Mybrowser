@@ -63,6 +63,14 @@ const fallbackRasterStyle: StyleSpecification = {
   ],
 };
 
+const isValidCoordinates = (value: unknown): value is Coordinates =>
+  Array.isArray(value) &&
+  value.length === 2 &&
+  Number.isFinite(value[0]) &&
+  Number.isFinite(value[1]) &&
+  Math.abs(value[0]) <= 180 &&
+  Math.abs(value[1]) <= 90;
+
 const buildPlaceLabel = (hit: NonNullable<GraphHopperGeocodingResponse['hits']>[number]) =>
   [hit.name, hit.street, hit.housenumber, hit.city, hit.state, hit.country].filter(Boolean).join(', ');
 
@@ -85,12 +93,18 @@ async function geocode(query: string): Promise<GeocodingResult[]> {
     throw new Error('GraphHopper не смог выполнить поиск адреса.');
   }
 
-  return (data.hits ?? [])
-    .filter((hit) => hit.point)
-    .map((hit) => ({
-      label: buildPlaceLabel(hit) || 'Найденное место',
-      coordinates: [hit.point!.lng, hit.point!.lat],
-    }));
+  return (data.hits ?? []).reduce<GeocodingResult[]>((results, hit) => {
+    const coordinates = hit.point ? [hit.point.lng, hit.point.lat] : null;
+
+    if (isValidCoordinates(coordinates)) {
+      results.push({
+        label: buildPlaceLabel(hit) || 'Найденное место',
+        coordinates,
+      });
+    }
+
+    return results;
+  }, []);
 }
 
 async function fetchRoute(origin: Coordinates, destination: Coordinates): Promise<RouteSummary> {
@@ -118,14 +132,20 @@ async function fetchRoute(origin: Coordinates, destination: Coordinates): Promis
 
   const selectedRoute = data.paths?.[0];
 
-  if (!selectedRoute?.points?.coordinates?.length) {
-    throw new Error('GraphHopper не вернул геометрию маршрута.');
+  if (!selectedRoute) {
+    throw new Error('GraphHopper не вернул маршрут.');
+  }
+
+  const geometry = selectedRoute.points?.coordinates?.filter(isValidCoordinates) ?? [];
+
+  if (geometry.length < 2) {
+    throw new Error('GraphHopper не вернул корректную геометрию маршрута.');
   }
 
   return {
     distance: selectedRoute.distance,
     duration: selectedRoute.time / 1000,
-    geometry: selectedRoute.points.coordinates,
+    geometry,
     steps:
       selectedRoute.instructions?.map((instruction) => ({
         instruction: instruction.text,
@@ -190,16 +210,18 @@ export function MapNavigator() {
     map.on('error', handleMapError);
     map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'bottom-right');
     map.addControl(new maplibregl.FullscreenControl(), 'bottom-right');
-    map.addControl(
-      new maplibregl.GeolocateControl({
-        positionOptions: { enableHighAccuracy: true },
-        trackUserLocation: true,
-      }),
-      'bottom-right',
-    );
 
     map.on('click', (event) => {
+      if (!event.lngLat) {
+        return;
+      }
+
       const clickedPoint: Coordinates = [event.lngLat.lng, event.lngLat.lat];
+
+      if (!isValidCoordinates(clickedPoint)) {
+        return;
+      }
+
       setDestination(clickedPoint);
       setDestinationQuery('Точка на карте');
 
@@ -219,7 +241,7 @@ export function MapNavigator() {
   }, []);
 
   useEffect(() => {
-    if (coordinates && !origin) {
+    if (isValidCoordinates(coordinates) && !origin) {
       setOrigin(coordinates);
       setOriginQuery('Моё местоположение');
     }
@@ -228,7 +250,7 @@ export function MapNavigator() {
   useEffect(() => {
     const map = mapRef.current;
 
-    if (!map || !coordinates) {
+    if (!map || !isValidCoordinates(coordinates)) {
       return;
     }
 
@@ -251,7 +273,7 @@ export function MapNavigator() {
       return;
     }
 
-    if (origin) {
+    if (isValidCoordinates(origin)) {
       if (!originMarkerRef.current) {
         originMarkerRef.current = new maplibregl.Marker({ color: '#16a34a' }).addTo(map);
       }
@@ -259,7 +281,7 @@ export function MapNavigator() {
       originMarkerRef.current.setLngLat(origin);
     }
 
-    if (destination) {
+    if (isValidCoordinates(destination)) {
       if (!destinationMarkerRef.current) {
         destinationMarkerRef.current = new maplibregl.Marker({ color: '#dc2626' }).addTo(map);
       }
@@ -280,7 +302,7 @@ export function MapNavigator() {
       properties: {},
       geometry: {
         type: 'LineString',
-        coordinates: route.geometry,
+        coordinates: route.geometry.filter(isValidCoordinates),
       },
     };
 
@@ -310,10 +332,12 @@ export function MapNavigator() {
       map.once('load', drawRoute);
     }
 
-    if (route.geometry.length > 1) {
-      const bounds = route.geometry.reduce(
+    const validRouteGeometry = route.geometry.filter(isValidCoordinates);
+
+    if (validRouteGeometry.length > 1) {
+      const bounds = validRouteGeometry.reduce(
         (currentBounds, point) => currentBounds.extend(point),
-        new maplibregl.LngLatBounds(route.geometry[0], route.geometry[0]),
+        new maplibregl.LngLatBounds(validRouteGeometry[0], validRouteGeometry[0]),
       );
 
       map.fitBounds(bounds, { padding: 80, duration: 900 });
