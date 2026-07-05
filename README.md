@@ -142,6 +142,8 @@ Settings → Pages
 GitHub Actions
 ```
 
+Не выбирайте **Deploy from a branch** для этого проекта: workflow уже сам собирает `dist` и публикует готовую сборку через GitHub Actions.
+
 ### 3. Запустите деплой
 
 После push в ветку `main` GitHub автоматически запустит workflow **Deploy to GitHub Pages**. Также его можно запустить вручную:
