@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MapLibre Navigator Preview</title>
+    <link href="https://unpkg.com/maplibre-gl@5.6.2/dist/maplibre-gl.css" rel="stylesheet" />
+    <style>
+      body { margin: 0; font-family: Inter, system-ui, sans-serif; color: #172033; }
+      #map { position: fixed; inset: 0; }
+      .panel { position: fixed; top: 16px; left: 16px; z-index: 2; width: min(380px, calc(100vw - 32px)); background: rgba(255,255,255,.96); border-radius: 20px; box-shadow: 0 20px 60px rgba(23,32,51,.16); padding: 18px; display: grid; gap: 10px; }
+      h1 { margin: 0; font-size: 1.25rem; }
+      p { margin: 0; color: #64748b; line-height: 1.4; }
+      input, button { border-radius: 12px; font: inherit; padding: 12px; }
+      input { border: 1px solid #d6dee9; }
+      button { border: 0; background: #2563eb; color: white; cursor: pointer; font-weight: 700; }
+      button.secondary { background: #172033; }
+      .status { color: #334155; font-size: .92rem; }
+      .error { color: #b42318; }
+      @media (max-width: 720px) { .panel { top: auto; bottom: 12px; left: 12px; width: calc(100% - 24px); } }
+    </style>
+  </head>
+  <body>
+    <div id="map"></div>
+    <section class="panel">
+      <h1>MapLibre Navigator preview</h1>
+      <p>Карта: MapLibre + OpenFreeMap. Маршруты: GraphHopper.</p>
+      <input id="key" placeholder="GraphHopper API key" />
+      <input id="from" placeholder="Откуда" value="Moscow" />
+      <input id="to" placeholder="Куда" value="Red Square Moscow" />
+      <button id="route">Построить маршрут</button>
+      <button id="locate" class="secondary">Моё местоположение</button>
+      <div class="status" id="status">Готово. Введите GraphHopper key для маршрутов.</div>
+    </section>
+    <script src="https://unpkg.com/maplibre-gl@5.6.2/dist/maplibre-gl.js"></script>
+    <script>
+      const apiBase = 'https://graphhopper.com/api/1';
+      const keyInput = document.getElementById('key');
+      const fromInput = document.getElementById('from');
+      const toInput = document.getElementById('to');
+      const statusEl = document.getElementById('status');
+      const savedKey = localStorage.getItem('graphhopper-preview-key');
+      if (savedKey) keyInput.value = savedKey;
+
+      const map = new maplibregl.Map({
+        container: 'map',
+        style: 'https://tiles.openfreemap.org/styles/liberty',
+        center: [37.6173, 55.7558],
+        zoom: 11,
+      });
+      map.addControl(new maplibregl.NavigationControl(), 'top-right');
+      map.addControl(new maplibregl.GeolocateControl({ positionOptions: { enableHighAccuracy: true }, trackUserLocation: true }), 'top-right');
+
+      let originMarker;
+      let destinationMarker;
+
+      const setStatus = (text, isError = false) => {
+        statusEl.textContent = text;
+        statusEl.className = isError ? 'status error' : 'status';
+      };
+
+      async function geocode(query, key) {
+        const coordinateMatch = query.trim().match(/^(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)$/);
+        if (coordinateMatch) return [Number(coordinateMatch[2]), Number(coordinateMatch[1])];
+
+        const params = new URLSearchParams({ q: query, locale: 'ru', limit: '1', key });
+        const response = await fetch(`${apiBase}/geocode?${params}`);
+        const data = await response.json();
+        if (!response.ok || !data.hits?.[0]?.point) throw new Error('Адрес не найден');
+        return [data.hits[0].point.lng, data.hits[0].point.lat];
+      }
+
+      async function buildRoute() {
+        const key = keyInput.value.trim();
+        if (!key) return setStatus('Введите GraphHopper API key.', true);
+        localStorage.setItem('graphhopper-preview-key', key);
+        setStatus('Строим маршрут...');
+
+        try {
+          const from = await geocode(fromInput.value, key);
+          const to = await geocode(toInput.value, key);
+          const params = new URLSearchParams({ vehicle: 'car', locale: 'ru', points_encoded: 'false', instructions: 'true', key });
+          params.append('point', `${from[1]},${from[0]}`);
+          params.append('point', `${to[1]},${to[0]}`);
+          const response = await fetch(`${apiBase}/route?${params}`);
+          const data = await response.json();
+          if (!response.ok || !data.paths?.[0]?.points?.coordinates) throw new Error(data.message || 'Маршрут не найден');
+          const coordinates = data.paths[0].points.coordinates;
+          const feature = { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates } };
+
+          if (map.getSource('route')) map.getSource('route').setData(feature);
+          else {
+            map.addSource('route', { type: 'geojson', data: feature });
+            map.addLayer({ id: 'route-line', type: 'line', source: 'route', paint: { 'line-color': '#2563eb', 'line-width': 5 } });
+          }
+
+          if (!originMarker) originMarker = new maplibregl.Marker({ color: '#16a34a' }).addTo(map);
+          if (!destinationMarker) destinationMarker = new maplibregl.Marker({ color: '#dc2626' }).addTo(map);
+          originMarker.setLngLat(from);
+          destinationMarker.setLngLat(to);
+          const bounds = coordinates.reduce((current, point) => current.extend(point), new maplibregl.LngLatBounds(coordinates[0], coordinates[0]));
+          map.fitBounds(bounds, { padding: 70 });
+          setStatus(`Маршрут построен: ${(data.paths[0].distance / 1000).toFixed(1)} км`);
+        } catch (error) {
+          setStatus(error.message || 'Ошибка маршрута', true);
+        }
+      }
+
+      document.getElementById('route').addEventListener('click', buildRoute);
+      document.getElementById('locate').addEventListener('click', () => {
+        navigator.geolocation?.getCurrentPosition((position) => {
+          const coords = [position.coords.longitude, position.coords.latitude];
+          map.easeTo({ center: coords, zoom: 14 });
+          fromInput.value = `${position.coords.latitude},${position.coords.longitude}`;
+          new maplibregl.Marker({ color: '#2563eb' }).setLngLat(coords).addTo(map);
+        });
+      });
+    </script>
+  </body>
+</html>
