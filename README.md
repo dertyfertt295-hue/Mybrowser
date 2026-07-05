@@ -122,6 +122,8 @@ https://your-site-name.netlify.app
 
 Проект можно залить на GitHub Pages без Netlify. В репозитории уже есть workflow `.github/workflows/deploy-pages.yml`, который сам собирает Vite-приложение и публикует папку `dist`.
 
+Важно: файл должен лежать именно в папке `.github/workflows/`. Если создать `.github/deploy-pages.yml` без папки `workflows`, GitHub Actions его не увидит.
+
 ### 1. Запушьте проект в GitHub
 
 ```bash
