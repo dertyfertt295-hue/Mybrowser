@@ -117,6 +117,47 @@ https://your-site-name.netlify.app
 3. Откройте dashboard/developer-раздел и создайте API key.
 4. Вставьте ключ в `.env.local` локально или в Environment Variables на Netlify как `VITE_GRAPHHOPPER_API_KEY`.
 
+
+## Деплой на GitHub Pages
+
+Проект можно залить на GitHub Pages без Netlify. В репозитории уже есть workflow `.github/workflows/deploy-pages.yml`, который сам собирает Vite-приложение и публикует папку `dist`.
+
+### 1. Запушьте проект в GitHub
+
+```bash
+git push -u origin main
+```
+
+### 2. Включите GitHub Pages через Actions
+
+В GitHub откройте репозиторий:
+
+```text
+Settings → Pages
+```
+
+В поле **Source** выберите:
+
+```text
+GitHub Actions
+```
+
+### 3. Запустите деплой
+
+После push в ветку `main` GitHub автоматически запустит workflow **Deploy to GitHub Pages**. Также его можно запустить вручную:
+
+```text
+Actions → Deploy to GitHub Pages → Run workflow
+```
+
+После успешного деплоя сайт будет доступен по адресу вида:
+
+```text
+https://dertyfertt295-hue.github.io/Mybrowser/
+```
+
+GraphHopper key уже лежит в `.env.production`, поэтому отдельно добавлять GitHub Secrets не нужно.
+
 ## Быстрый preview без сборки
 
 Standalone preview лежит в папке `preview` и использует CDN-версию MapLibre + OpenFreeMap. Для маршрутов введите GraphHopper API key на странице.
